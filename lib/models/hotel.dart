@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 class Hotel {
   final String key;
   final String hotelRef;
@@ -8,6 +10,7 @@ class Hotel {
   final String pickup;
   final String checkIn;
   final String checkOut;
+  final String? coordinates; // New Field
 
   const Hotel({
     required this.key,
@@ -19,7 +22,22 @@ class Hotel {
     required this.pickup,
     required this.checkIn,
     required this.checkOut,
+    this.coordinates, // New Field
   });
+
+  Map<String, dynamic> toMap() {
+    return {
+      'hotelRef': hotelRef,
+      'hotelName': hotelName,
+      'address': address,
+      'board': board,
+      'transport': transport,
+      'pickup': pickup,
+      'checkIn': checkIn,
+      'checkOut': checkOut,
+      'coordinates': coordinates, // New Field
+    };
+  }
 
   Hotel copyWith({
     String? transport,
@@ -27,6 +45,7 @@ class Hotel {
     String? board,
     String? checkIn,
     String? checkOut,
+    String? coordinates, // New Field
   }) {
     return Hotel(
       key: key,
@@ -38,10 +57,22 @@ class Hotel {
       pickup: pickup ?? this.pickup,
       checkIn: checkIn ?? this.checkIn,
       checkOut: checkOut ?? this.checkOut,
+      coordinates: coordinates ?? this.coordinates, // New Field
     );
   }
 
-  factory Hotel.fromMap(String key, Map<String, dynamic> data) {
+factory Hotel.fromMap(String key, Map<String, dynamic> data) {
+  // Extract coordinates safely
+  String? coordsString;
+  final coordsData = data['coordinates'];
+
+  if (coordsData is GeoPoint) {
+    // Convert native GeoPoint to "lat,long" string for the URL launcher
+    coordsString = '${coordsData.latitude},${coordsData.longitude}';
+  } else if (coordsData is String) {
+    coordsString = coordsData;
+  }
+
     return Hotel(
       key: key,
       hotelRef: data['hotelRef'] as String? ?? '',
@@ -52,6 +83,7 @@ class Hotel {
       pickup: data['pickup'] as String? ?? '',
       checkIn: data['checkIn'] as String? ?? '',
       checkOut: data['checkOut'] as String? ?? '',
+      coordinates: coordsString, // Now it correctly receives a String
     );
   }
 }

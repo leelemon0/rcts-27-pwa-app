@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/client_data.dart';
-import '../services/mock_database.dart';
+import '../models/hotel.dart';
+import '../models/user.dart';
 import '../widgets/shared_widgets.dart';
 
 class ItineraryScreen extends StatefulWidget {
@@ -13,9 +16,13 @@ class ItineraryScreen extends StatefulWidget {
   State<ItineraryScreen> createState() => _ItineraryScreenState();
 }
 
-class _ItineraryScreenState extends State<ItineraryScreen> {
+class _ItineraryScreenState extends State<ItineraryScreen>
+    with AutomaticKeepAliveClientMixin {
   final TextEditingController _subjectController = TextEditingController();
   final TextEditingController _messageController = TextEditingController();
+
+  @override
+  bool get wantKeepAlive => true;
 
   String _getGreeting() {
     final hour = DateTime.now().hour;
@@ -24,162 +31,245 @@ class _ItineraryScreenState extends State<ItineraryScreen> {
     return 'Good evening';
   }
 
-  void _handleLogout() {
-    Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
+  Future<void> _openMapDirections(String? coords) async {
+    if (coords == null || coords.isEmpty) return;
+
+    final Uri googleMapsUrl = Uri.parse("https://www.google.com/maps/search/?api=1&query=$coords");
+    final Uri appleMapsUrl = Uri.parse("https://maps.apple.com/?q=$coords");
+
+    if (await canLaunchUrl(googleMapsUrl)) {
+      await launchUrl(googleMapsUrl, mode: LaunchMode.externalApplication);
+    } else if (await canLaunchUrl(appleMapsUrl)) {
+      await launchUrl(appleMapsUrl, mode: LaunchMode.externalApplication);
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not open maps application.')),
+        );
+      }
+    }
+  }
+
+  void _handleLogout() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('user_ref');
+
+    if (mounted) {
+      Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final currentRoomID = widget.clientData.user.roomID;
-    final currentUserName = widget.clientData.user.name;
-    final sharers = MockDatabase.users.values
-        .where((user) =>
-            user.roomID == currentRoomID &&
-            user.name != currentUserName &&
-            user.hotelKey == widget.clientData.user.hotelKey)
-        .map((user) => user.name)
-        .join(', ');
+    super.build(context);
+    final user = widget.clientData.user;
 
     return Scaffold(
+      backgroundColor: const Color(0xFF001436),
       appBar: AppBar(
+        elevation: 0,
         backgroundColor: const Color(0xFF001436),
-        leadingWidth: 200,
+        leadingWidth: 120,
         leading: Padding(
           padding: const EdgeInsets.only(left: 16.0),
           child: Image.asset(
             'web/icons/EventLogo.png',
-            height: 40,
             fit: BoxFit.contain,
             filterQuality: FilterQuality.high,
-            errorBuilder: (context, error, stackTrace) {
-              return const Icon(Icons.confirmation_num_outlined, color: Color(0xFFFFD700));
-            },
+            errorBuilder: (context, error, stackTrace) =>
+                const Icon(Icons.emoji_events_outlined, color: Color(0xFFFFD700)),
           ),
         ),
-        title: const Text('RCTS Event Guide', style: TextStyle(fontSize: 18)),
+        title: const Text(
+          'EVENT GUIDE',
+          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1.2),
+        ),
         centerTitle: true,
         actions: [
           IconButton(
-            icon: const Icon(Icons.logout, color: Color(0xFFFFD700)),
+            icon: const Icon(Icons.logout_rounded, color: Color(0xFFFFD700)),
             onPressed: _handleLogout,
           )
         ],
       ),
-      body: Column(
-        children: [
-          Expanded(
-            child: ListView(
-              padding: const EdgeInsets.all(16),
-              children: [
-                BroadcastBanner(userHotelKey: widget.clientData.user.hotelKey),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  crossAxisAlignment: CrossAxisAlignment.start,
+      body: StreamBuilder<DocumentSnapshot>(
+        stream: FirebaseFirestore.instance
+            .collection('hotels')
+            .doc(user.hotelKey)
+            .snapshots(),
+        builder: (context, hotelSnapshot) {
+          final liveHotel = hotelSnapshot.hasData && hotelSnapshot.data!.exists
+              ? Hotel.fromMap(hotelSnapshot.data!.id,
+                  hotelSnapshot.data!.data() as Map<String, dynamic>)
+              : widget.clientData.hotel;
+
+          return Column(
+            children: [
+              Expanded(
+                child: ListView(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            '${_getGreeting()} ${widget.clientData.user.name},',
-                            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                    BroadcastBanner(userHotelKey: user.hotelKey),
+                    const SizedBox(height: 16),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '${_getGreeting()} ${user.name},',
+                                style: const TextStyle(
+                                    fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white),
+                              ),
+                              const SizedBox(height: 4),
+                              const Text('View your 2027 Ryder Cup details:',
+                                  style: TextStyle(color: Colors.white60)),
+                            ],
                           ),
-                          const SizedBox(height: 4),
-                          const Text('View your 2027 Ryder Cup details:', style: TextStyle(color: Colors.white70)),
-                        ],
-                      ),
+                        ),
+                        const WeatherWidget(),
+                      ],
                     ),
-                    const WeatherWidget(),
-                  ],
-                ),
-                const SizedBox(height: 24),
-                ItineraryCard(
-                  title: '2027 Ryder Cup',
-                  subtitle: 'General Admission - 4-day Ticket',
-                  icon: Icons.stadium,
-                  details: TicketDetails(
-                    ref: widget.clientData.user.ref ?? '',
-                    name: widget.clientData.user.name,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                ItineraryCard(
-                  title: widget.clientData.hotelName ?? 'Hotel Information',
-                  subtitle: 'Check-in: 15 Sept, 15:00',
-                  icon: Icons.hotel,
-                  details: HotelDetails(
-                    hotel: widget.clientData.hotelName,
-                    address: widget.clientData.address,
-                    room: sharers.isNotEmpty ? '${widget.clientData.user.room} (Sharing with: $sharers)' : widget.clientData.user.room,
-                    board: widget.clientData.board,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                ItineraryCard(
-                  title: 'Coach Transfer',
-                  subtitle: 'Status: Confirmed',
-                  icon: Icons.directions_bus,
-                  details: TransportDetails(
-                    vehicle: widget.clientData.transport,
-                    pickup: widget.clientData.pickup,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                const ItineraryCard(
-                  title: 'Tournament Info',
-                  subtitle: 'Players, Matchups & History',
-                  icon: Icons.info_outline,
-                  details: TournamentDetails(),
-                ),
-                const SizedBox(height: 16),
-                ItineraryCard(
-                  title: 'THE BUNKER',
-                  subtitle: 'Exclusive Content & Guides',
-                  icon: Icons.shopping_cart_outlined,
-                  details: Column(
-                    children: [
-                      const Text(
-                        'Access exclusive tournament content, behind-the-scenes footage, and the info about the area through the RCTS digital portal.',
-                        style: TextStyle(fontSize: 13, height: 1.4),
+                    const SizedBox(height: 24),
+                    if (user.hasTicket) ...[
+                      ItineraryCard(
+                        title: '2027 Ryder Cup',
+                        subtitle: 'General Admission - 4-day Ticket',
+                        icon: Icons.confirmation_number_outlined,
+                        details: TicketDetails(
+                          ref: user.ref ?? '',
+                          name: user.name,
+                        ),
                       ),
                       const SizedBox(height: 16),
-                      ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFFFFD700),
-                          foregroundColor: const Color(0xFF001436),
-                        ),
-                        onPressed: () async {
-                            final messenger = ScaffoldMessenger.of(context);
-                            final Uri url = Uri.parse('https://www.rydercuptravelservices.com/');
-                            final bool launched = await launchUrl(url);
-                            if (!mounted) return;
-                            if (!launched) {
-                              messenger.showSnackBar(const SnackBar(content: Text('Could not open external site.')));
-                          }
-                        },
-                        child: const Text('Enter The Bunker'),
-                      )
                     ],
-                  ),
+                    _buildHotelCard(user, liveHotel),
+                    if (user.hasTransport) ...[
+                      const SizedBox(height: 16),
+                      ItineraryCard(
+                        title: 'Ground Transportation',
+                        subtitle: 'Status: Confirmed',
+                        icon: Icons.directions_bus_outlined,
+                        details: TransportDetails(
+                          vehicle: liveHotel?.transport ?? widget.clientData.transport,
+                          pickup: liveHotel?.pickup ?? widget.clientData.pickup,
+                          hotelKey: user.hotelKey,
+                          reference: user.ref,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 16),
+                    const ItineraryCard(
+                      title: 'Tournament Info',
+                      subtitle: 'Players, Matchups & History',
+                      icon: Icons.info_outline_rounded,
+                      details: TournamentDetails(),
+                    ),
+                    const SizedBox(height: 16),
+                    _buildBunkerCard(),
+                    const SizedBox(height: 24),
+                  ],
                 ),
-              ],
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: ElevatedButton.icon(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF003C82),
-                foregroundColor: const Color(0xFFFFD700),
-                minimumSize: const Size(double.infinity, 50),
-                side: const BorderSide(color: Color(0xFFFFD700)),
               ),
-              icon: const Icon(Icons.support_agent),
-              label: const Text('Contact Support'),
-              onPressed: _showContactForm,
-            ),
+              _buildSupportButton(),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildHotelCard(User user, Hotel? hotel) {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('guests')
+          .where('hotelKey', isEqualTo: user.hotelKey)
+          .where('roomID', isEqualTo: user.roomID)
+          .snapshots(),
+      builder: (context, snapshot) {
+        String sharersText = "";
+        if (snapshot.hasData) {
+          final sharers = snapshot.data!.docs
+              .map((doc) => doc['name'] as String)
+              .where((name) => name != user.name)
+              .join(', ');
+          sharersText = sharers.isNotEmpty ? ' (Sharing with: $sharers)' : '';
+        }
+
+        return ItineraryCard(
+          title: hotel?.hotelName ?? 'Hotel Information',
+          subtitle: 'Check-in: 15 Sept, 15:00',
+          icon: Icons.hotel_outlined,
+          details: HotelDetails(
+            hotel: hotel?.hotelName,
+            address: hotel?.address,
+            room: '${user.room}$sharersText',
+            board: hotel?.board,
+            onDirectionsTap: () => _openMapDirections(hotel?.coordinates),
           ),
+        );
+      },
+    );
+  }
+
+  Widget _buildBunkerCard() {
+    return ItineraryCard(
+      title: 'The Bunker',
+      subtitle: 'Exclusive Content & Guides',
+      icon: Icons.diamond_outlined,
+      details: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text(
+            'Access exclusive tournament content, behind-the-scenes footage, and the info about the area through the RCTS digital portal.',
+            style: TextStyle(fontSize: 13, height: 1.4, color: Colors.white70),
+          ),
+          const SizedBox(height: 16),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFFFD700),
+              foregroundColor: const Color(0xFF001436),
+              elevation: 0,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              padding: const EdgeInsets.symmetric(vertical: 12),
+            ),
+            onPressed: () async {
+              final Uri url = Uri.parse('https://www.rydercuptravelservices.com/');
+              if (await canLaunchUrl(url)) {
+                await launchUrl(url);
+              }
+            },
+            child: const Text('ENTER THE BUNKER', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1)),
+          )
         ],
+      ),
+    );
+  }
+
+  Widget _buildSupportButton() {
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFF001436),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.2), blurRadius: 10, offset: const Offset(0, -2))],
+      ),
+      padding: const EdgeInsets.all(16.0),
+      child: SafeArea(
+        top: false,
+        child: ElevatedButton.icon(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF003C82),
+            foregroundColor: const Color(0xFFFFD700),
+            minimumSize: const Size(double.infinity, 56),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            side: const BorderSide(color: Color(0xFFFFD700), width: 1),
+          ),
+          icon: const Icon(Icons.support_agent_rounded),
+          label: const Text('CONTACT SUPPORT', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1)),
+          onPressed: _showContactForm,
+        ),
       ),
     );
   }
@@ -189,32 +279,106 @@ class _ItineraryScreenState extends State<ItineraryScreen> {
       context: context,
       isScrollControlled: true,
       backgroundColor: const Color(0xFF001436),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (context) => Padding(
         padding: EdgeInsets.only(
           bottom: MediaQuery.of(context).viewInsets.bottom,
-          left: 24,
-          right: 24,
-          top: 24,
+          left: 24, right: 24, top: 32,
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Text('Support Request', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFFFFD700))),
-            const SizedBox(height: 20),
-            TextField(controller: _subjectController, decoration: const InputDecoration(labelText: 'Subject', filled: true, fillColor: Colors.white10)),
-            const SizedBox(height: 12),
-            TextField(controller: _messageController, maxLines: 4, decoration: const InputDecoration(labelText: 'Message', filled: true, fillColor: Colors.white10)),
+            const Text('Support Request',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFFFFD700))),
+            const SizedBox(height: 8),
+            const Text('How can we help you today?', style: TextStyle(color: Colors.white60, fontSize: 14)),
+            const SizedBox(height: 24),
+            TextField(
+                controller: _subjectController,
+                style: const TextStyle(color: Colors.white),
+                decoration: InputDecoration(
+                  labelText: 'Subject',
+                  labelStyle: const TextStyle(color: Colors.white38),
+                  filled: true,
+                  fillColor: Colors.white.withValues(alpha: 0.05),
+                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFFFD700))),
+                )),
+            const SizedBox(height: 16),
+            TextField(
+                controller: _messageController,
+                maxLines: 4,
+                style: const TextStyle(color: Colors.white),
+                decoration: InputDecoration(
+                  labelText: 'Message',
+                  labelStyle: const TextStyle(color: Colors.white38),
+                  filled: true,
+                  fillColor: Colors.white.withValues(alpha: 0.05),
+                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFFFD700))),
+                )),
             const SizedBox(height: 24),
             ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFFD700), foregroundColor: const Color(0xFF001436)),
-              onPressed: () {
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(backgroundColor: Colors.green, content: Text('Message Sent.')));
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFFFD700),
+                foregroundColor: const Color(0xFF001436),
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              onPressed: () async {
+                final String subject = _subjectController.text.trim();
+                final String message = _messageController.text.trim();
+
+                if (subject.isEmpty || message.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Please fill in all fields.')),
+                  );
+                  return;
+                }
+
+                // Pre-capture states to avoid using context across async gaps
+                final messenger = ScaffoldMessenger.of(context);
+                final navigator = Navigator.of(context);
+
+                try {
+                  await FirebaseFirestore.instance.collection('support_requests').add({
+                    'user_name': widget.clientData.user.name,
+                    'user_ref': widget.clientData.user.ref,
+                    'user_email': widget.clientData.user.email,
+                    'hotel_key': widget.clientData.user.hotelKey,
+                    'subject': subject,
+                    'message': message,
+                    'timestamp': FieldValue.serverTimestamp(),
+                    'status': 'pending',
+                  });
+
+                  _subjectController.clear();
+                  _messageController.clear();
+
+                  if (mounted) {
+                    navigator.pop();
+                    messenger.showSnackBar(
+                      const SnackBar(
+                        backgroundColor: Colors.green,
+                        content: Text('Support request sent successfully.'),
+                      ),
+                    );
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    messenger.showSnackBar(
+                      SnackBar(content: Text('Failed to send: $e')),
+                    );
+                  }
+                }
               },
-              child: const Text('Submit'),
+              child: const Text(
+                'SUBMIT',
+                style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1),
+              ),
             ),
-            const SizedBox(height: 30),
+            const SizedBox(height: 40),
           ],
         ),
       ),

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "674104501565",
+    "project_id": "rcts-pwa-2027",
+    "storage_bucket": "rcts-pwa-2027.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:674104501565:android:e65f587f91d760189ad154",
+        "android_client_info": {
+          "package_name": "com.rcts.my_new_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA4DHOcXGshlxEN228iXsykIjLq8NE6ZXI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
