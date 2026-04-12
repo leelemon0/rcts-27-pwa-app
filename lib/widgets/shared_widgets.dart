@@ -99,23 +99,15 @@ class _WeatherWidgetState extends State<WeatherWidget> {
     _weatherFuture = _fetchWeather();
   }
 
-  Future<WeatherData> _fetchWeather() async {
+Future<WeatherData> _fetchWeather() async {
   try {
     final remoteConfig = FirebaseRemoteConfig.instance;
-    
-    // 1. Configure settings (Lower interval for development, e.g., 1 hour)
-    await remoteConfig.setConfigSettings(RemoteConfigSettings(
-      fetchTimeout: const Duration(minutes: 1),
-      minimumFetchInterval: const Duration(hours: 1), 
-    ));
 
-    // 2. Fetch and activate the latest values from Firebase
+    // Use a simplified fetch call without complex settings here
     await remoteConfig.fetchAndActivate();
 
-    // 3. Retrieve the key you saved in the console
     final String apiKey = remoteConfig.getString('weather_api_key');
-
-    if (apiKey.isEmpty) throw 'API Key not found in Remote Config';
+    if (apiKey.isEmpty) throw 'Missing API Key';
 
     final url = 'https://api.openweathermap.org/data/2.5/weather?lat=52.5639&lon=-8.7892&appid=$apiKey&units=metric';
 

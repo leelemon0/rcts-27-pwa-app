@@ -205,9 +205,15 @@ void _showAddManagerDialog(BuildContext context, String hotelKey, List<User> ava
                     ),
                     onTap: () {
                       Navigator.pop(context);
-                      if (m.hotelKey == null) {
-                        FirebaseFirestore.instance.collection('staff').doc(m.email).update({'hotelKey': hotelKey});
+                      
+                      // If they have no assignments, we can just update directly
+                      if (m.hotelKey == null || m.hotelKey!.isEmpty) {
+                        FirebaseFirestore.instance
+                            .collection('staff')
+                            .doc(m.email)
+                            .update({'hotelKey': hotelKey});
                       } else {
+                        // If they have ANY existing assignment, show the Move/Both dialog
                         _showConflictResolutionDialog(context, m, hotelKey);
                       }
                     },
