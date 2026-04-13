@@ -6,23 +6,6 @@ import '../models/broadcast.dart';
 
 /// --- EDIT HOTEL SHEET ---
 void showEditHotelSheet(BuildContext context, Hotel hotel, VoidCallback onSave, {bool canEditManager = true}) {
-  final transportCtrl = TextEditingController(text: hotel.transport);
-  final pickupCtrl = TextEditingController(text: hotel.pickup);
-  final boardCtrl = TextEditingController(text: hotel.board);
-  final checkInCtrl = TextEditingController(text: hotel.checkIn);
-  final checkOutCtrl = TextEditingController(text: hotel.checkOut);
-  
-  final thuCtrl = TextEditingController(text: hotel.transportThursday ?? "");
-  final friCtrl = TextEditingController(text: hotel.transportFriday ?? "");
-  final satCtrl = TextEditingController(text: hotel.transportSaturday ?? "");
-  final sunCtrl = TextEditingController(text: hotel.transportSunday ?? "");
-  
-  final guideCtrl = TextEditingController(text: hotel.experienceGuide ?? "");
-  final scheduleCtrl = TextEditingController(text: hotel.entertainmentSchedule ?? "");
-
-  // Track which section is expanded (0 = none, 1 = Hotel, 2 = Transport, 3 = Experience)
-  int expandedIndex = 0;
-
   showModalBottomSheet(
     context: context,
     isScrollControlled: true,
@@ -30,181 +13,226 @@ void showEditHotelSheet(BuildContext context, Hotel hotel, VoidCallback onSave, 
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
     ),
-    builder: (context) => StatefulBuilder(
-      builder: (context, setModalState) => Padding(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.of(context).viewInsets.bottom,
-          left: 24, right: 24, top: 24,
-        ),
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                (hotel.hotelType == 'glamping' || hotel.hotelType == 'cruise')
-                    ? 'Edit ${(hotel.hotelType ?? '')[0].toUpperCase()}${(hotel.hotelType ?? '').substring(1)} Details'
-                    : 'Edit Hotel & Logistics for ${hotel.hotelName}',
-                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFFFFD700)),
-              ),
-              const SizedBox(height: 16),
-              
-              if (canEditManager) ...[
-                _buildManagementTeamSection(hotel.key),
-                const SizedBox(height: 16),
-              ],
-
-              // --- SECTION 1: HOTEL DETAILS ---
-              Theme(
-                data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-                child: ExpansionTile(
-                  key: GlobalKey(),
-                  initiallyExpanded: expandedIndex == 1,
-                  onExpansionChanged: (isExpanded) {
-                    if (isExpanded) {
-                      setModalState(() => expandedIndex = 1);
-                    } else if (expandedIndex == 1) {
-                      setModalState(() => expandedIndex = 0);
-                    }
-                  },
-                  tilePadding: EdgeInsets.zero,
-                  iconColor: const Color(0xFFFFD700),
-                  collapsedIconColor: Colors.white54,
-                  title: const Text(
-                    'Hotel Details',
-                    style: TextStyle(color: Color(0xFFFFD700), fontSize: 15, fontWeight: FontWeight.bold),
-                  ),
-                  children: [
-                    const SizedBox(height: 12),
-                    _buildField(boardCtrl, 'Board Basis'),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(child: _buildField(checkInCtrl, 'Check-in Time')),
-                        const SizedBox(width: 12),
-                        Expanded(child: _buildField(checkOutCtrl, 'Check-out Time')),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                  ],
-                ),
-              ),
-
-              // --- SECTION 2: TRANSPORT DETAILS ---
-              Theme(
-                data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-                child: ExpansionTile(
-                  key: GlobalKey(),
-                  initiallyExpanded: expandedIndex == 2,
-                  onExpansionChanged: (isExpanded) {
-                    if (isExpanded) {
-                      setModalState(() => expandedIndex = 2);
-                    } else if (expandedIndex == 2) {
-                      setModalState(() => expandedIndex = 0);
-                    }
-                  },
-                  tilePadding: EdgeInsets.zero,
-                  iconColor: const Color(0xFFFFD700),
-                  collapsedIconColor: Colors.white54,
-                  title: const Text(
-                    'Transport Details',
-                    style: TextStyle(color: Color(0xFFFFD700), fontSize: 15, fontWeight: FontWeight.bold),
-                  ),
-                  children: [
-                    const SizedBox(height: 12),
-                    _buildField(transportCtrl, 'Transport Type'),
-                    const SizedBox(height: 12),
-                    _buildField(pickupCtrl, 'Pickup Location'),
-                    const SizedBox(height: 20),
-                    const Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text('Daily Shuttle Times', 
-                        style: TextStyle(color: Colors.white54, fontSize: 12, fontWeight: FontWeight.w600)),
-                    ),
-                    const SizedBox(height: 12),
-                    _buildField(thuCtrl, 'Thursday Schedule'),
-                    const SizedBox(height: 12), // Spacing standardised to match other fields
-                    _buildField(friCtrl, 'Friday Schedule'),
-                    const SizedBox(height: 12),
-                    _buildField(satCtrl, 'Saturday Schedule'),
-                    const SizedBox(height: 12),
-                    _buildField(sunCtrl, 'Sunday Schedule'),
-                    const SizedBox(height: 16),
-                  ],
-                ),
-              ),
-
-              // --- SECTION 3: EXPERIENCE DETAILS (Glamping/Cruise Only) ---
-              if (hotel.hotelType == 'glamping' || hotel.hotelType == 'cruise')
-                Theme(
-                  data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-                  child: ExpansionTile(
-                    key: GlobalKey(),
-                    initiallyExpanded: expandedIndex == 3,
-                    onExpansionChanged: (isExpanded) {
-                      if (isExpanded) {
-                        setModalState(() => expandedIndex = 3);
-                      } else if (expandedIndex == 3) {
-                        setModalState(() => expandedIndex = 0);
-                      }
-                    },
-                    tilePadding: EdgeInsets.zero,
-                    iconColor: const Color(0xFFFFD700),
-                    collapsedIconColor: Colors.white54,
-                    title: const Text(
-                      'Experience Details',
-                      style: TextStyle(color: Color(0xFFFFD700), fontSize: 15, fontWeight: FontWeight.bold),
-                    ),
-                    children: [
-                      const SizedBox(height: 12),
-                      _buildField(guideCtrl, 'Experience Guide', maxLines: 4),
-                      const SizedBox(height: 12),
-                      _buildField(scheduleCtrl, 'Entertainment Schedule', maxLines: 4),
-                      const SizedBox(height: 16),
-                    ],
-                  ),
-                ),
-
-              const SizedBox(height: 24),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFFFD700), 
-                  foregroundColor: const Color(0xFF001436),
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-                onPressed: () async {
-                  final updatedHotel = hotel.copyWith(
-                    transport: transportCtrl.text.trim(),
-                    pickup: pickupCtrl.text.trim(),
-                    board: boardCtrl.text.trim(),
-                    checkIn: checkInCtrl.text.trim(),
-                    checkOut: checkOutCtrl.text.trim(),
-                    experienceGuide: guideCtrl.text.trim(),
-                    entertainmentSchedule: scheduleCtrl.text.trim(),
-                    transportThursday: thuCtrl.text.trim(),
-                    transportFriday: friCtrl.text.trim(),
-                    transportSaturday: satCtrl.text.trim(),
-                    transportSunday: sunCtrl.text.trim(),
-                  );
-
-                  await FirebaseFirestore.instance
-                      .collection('hotels')
-                      .doc(hotel.key)
-                      .update(updatedHotel.toMap());
-
-                  onSave();
-                  if (context.mounted) Navigator.pop(context);
-                },
-                child: const Text('SAVE ALL CHANGES', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1)),
-              ),
-              const SizedBox(height: 40),
-            ],
-          ),
-        ),
-      ),
+    builder: (context) => _EditHotelForm(
+      hotel: hotel,
+      onSave: onSave,
+      canEditManager: canEditManager,
     ),
   );
+}
+
+class _EditHotelForm extends StatefulWidget {
+  final Hotel hotel;
+  final VoidCallback onSave;
+  final bool canEditManager;
+
+  const _EditHotelForm({
+    required this.hotel,
+    required this.onSave,
+    required this.canEditManager,
+  });
+
+  @override
+  State<_EditHotelForm> createState() => _EditHotelFormState();
+}
+
+class _EditHotelFormState extends State<_EditHotelForm> {
+  // Controllers persist here to prevent keyboard focus loss
+  late TextEditingController transportCtrl;
+  late TextEditingController pickupCtrl;
+  late TextEditingController boardCtrl;
+  late TextEditingController checkInCtrl;
+  late TextEditingController checkOutCtrl;
+  late TextEditingController thuCtrl;
+  late TextEditingController friCtrl;
+  late TextEditingController satCtrl;
+  late TextEditingController sunCtrl;
+  late TextEditingController guideCtrl;
+  late TextEditingController scheduleCtrl;
+
+  int expandedIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    transportCtrl = TextEditingController(text: widget.hotel.transport);
+    pickupCtrl = TextEditingController(text: widget.hotel.pickup);
+    boardCtrl = TextEditingController(text: widget.hotel.board);
+    checkInCtrl = TextEditingController(text: widget.hotel.checkIn);
+    checkOutCtrl = TextEditingController(text: widget.hotel.checkOut);
+    thuCtrl = TextEditingController(text: widget.hotel.transportThursday ?? "");
+    friCtrl = TextEditingController(text: widget.hotel.transportFriday ?? "");
+    satCtrl = TextEditingController(text: widget.hotel.transportSaturday ?? "");
+    sunCtrl = TextEditingController(text: widget.hotel.transportSunday ?? "");
+    guideCtrl = TextEditingController(text: widget.hotel.experienceGuide ?? "");
+    scheduleCtrl = TextEditingController(text: widget.hotel.entertainmentSchedule ?? "");
+  }
+
+  @override
+  void dispose() {
+    transportCtrl.dispose();
+    pickupCtrl.dispose();
+    boardCtrl.dispose();
+    checkInCtrl.dispose();
+    checkOutCtrl.dispose();
+    thuCtrl.dispose();
+    friCtrl.dispose();
+    satCtrl.dispose();
+    sunCtrl.dispose();
+    guideCtrl.dispose();
+    scheduleCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+        left: 24, right: 24, top: 24,
+      ),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              (widget.hotel.hotelType == 'glamping' || widget.hotel.hotelType == 'cruise')
+                  ? 'Edit ${(widget.hotel.hotelType ?? '')[0].toUpperCase()}${(widget.hotel.hotelType ?? '').substring(1)} Details'
+                  : 'Edit Hotel & Logistics for ${widget.hotel.hotelName}',
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFFFFD700)),
+            ),
+            const SizedBox(height: 16),
+            
+            if (widget.canEditManager) ...[
+              _buildManagementTeamSection(widget.hotel.key),
+              const SizedBox(height: 16),
+            ],
+
+            _buildExpansionTile(1, 'Hotel Details', [
+              const SizedBox(height: 12),
+              _buildField(boardCtrl, 'Board Basis'),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(child: _buildField(checkInCtrl, 'Check-in Time')),
+                  const SizedBox(width: 12),
+                  Expanded(child: _buildField(checkOutCtrl, 'Check-out Time')),
+                ],
+              ),
+            ]),
+
+            _buildExpansionTile(2, 'Transport Details', [
+              const SizedBox(height: 12),
+              _buildField(transportCtrl, 'Transport Type'),
+              const SizedBox(height: 12),
+              _buildField(pickupCtrl, 'Pickup Location'),
+              const SizedBox(height: 20),
+              const Align(
+                alignment: Alignment.centerLeft,
+                child: Text('Daily Shuttle Times', 
+                  style: TextStyle(color: Colors.white54, fontSize: 12, fontWeight: FontWeight.w600)),
+              ),
+              const SizedBox(height: 12),
+              _buildField(thuCtrl, 'Thursday Schedule'),
+              const SizedBox(height: 12),
+              _buildField(friCtrl, 'Friday Schedule'),
+              const SizedBox(height: 12),
+              _buildField(satCtrl, 'Saturday Schedule'),
+              const SizedBox(height: 12),
+              _buildField(sunCtrl, 'Sunday Schedule'),
+            ]),
+
+            if (widget.hotel.hotelType == 'glamping' || widget.hotel.hotelType == 'cruise')
+              _buildExpansionTile(3, 'Experience Details', [
+                const SizedBox(height: 12),
+                _buildField(guideCtrl, 'Experience Guide', maxLines: 4),
+                const SizedBox(height: 12),
+                _buildField(scheduleCtrl, 'Entertainment Schedule', maxLines: 4),
+              ]),
+
+            const SizedBox(height: 24),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFFFD700), 
+                foregroundColor: const Color(0xFF001436),
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              onPressed: () async {
+                final updatedHotel = widget.hotel.copyWith(
+                  transport: transportCtrl.text.trim(),
+                  pickup: pickupCtrl.text.trim(),
+                  board: boardCtrl.text.trim(),
+                  checkIn: checkInCtrl.text.trim(),
+                  checkOut: checkOutCtrl.text.trim(),
+                  experienceGuide: guideCtrl.text.trim(),
+                  entertainmentSchedule: scheduleCtrl.text.trim(),
+                  transportThursday: thuCtrl.text.trim(),
+                  transportFriday: friCtrl.text.trim(),
+                  transportSaturday: satCtrl.text.trim(),
+                  transportSunday: sunCtrl.text.trim(),
+                );
+
+                // Capture navigator before async gap
+                final navigator = Navigator.of(context);
+
+                await FirebaseFirestore.instance
+                    .collection('hotels')
+                    .doc(widget.hotel.key)
+                    .update(updatedHotel.toMap());
+
+                widget.onSave();
+                
+                // Guard navigation with mounted check
+                if (!mounted) return;
+                navigator.pop();
+              },
+              child: const Text('SAVE ALL CHANGES', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1)),
+            ),
+            const SizedBox(height: 40),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildExpansionTile(int index, String title, List<Widget> children) {
+    return Theme(
+      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+      child: ExpansionTile(
+        key: PageStorageKey('section_$index'),
+        initiallyExpanded: expandedIndex == index,
+        onExpansionChanged: (isExpanded) {
+          setState(() => expandedIndex = isExpanded ? index : 0);
+        },
+        tilePadding: EdgeInsets.zero,
+        iconColor: const Color(0xFFFFD700),
+        collapsedIconColor: Colors.white54,
+        title: Text(
+          title,
+          style: const TextStyle(color: Color(0xFFFFD700), fontSize: 15, fontWeight: FontWeight.bold),
+        ),
+        children: [...children, const SizedBox(height: 16)],
+      ),
+    );
+  }
+
+  Widget _buildField(TextEditingController controller, String label, {int maxLines = 1}) {
+    return TextField(
+      controller: controller,
+      maxLines: maxLines,
+      style: const TextStyle(color: Colors.white, fontSize: 14),
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: const TextStyle(color: Colors.white38),
+        filled: true,
+        fillColor: Colors.white.withAlpha(13),
+        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFFFD700))),
+      ),
+    );
+  }
 }
 
 /// --- TEAM MANAGEMENT WIDGET ---
@@ -273,23 +301,6 @@ Widget _buildManagementTeamSection(String hotelKey) {
         ],
       );
     },
-  );
-}
-
-// Global helper for styling TextFields
-Widget _buildField(TextEditingController controller, String label, {int maxLines = 1}) {
-  return TextField(
-    controller: controller,
-    maxLines: maxLines,
-    style: const TextStyle(color: Colors.white, fontSize: 14),
-    decoration: InputDecoration(
-      labelText: label,
-      labelStyle: const TextStyle(color: Colors.white38),
-      filled: true,
-      fillColor: Colors.white.withValues(alpha: 0.05),
-      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFFFD700))),
-    ),
   );
 }
 
@@ -387,7 +398,6 @@ void _showConflictResolutionDialog(BuildContext context, User manager, String ne
 
 /// --- BROADCAST ALERTS ---
 void showBroadcastSheet(BuildContext context, String senderName, {String? fixedHotelKey}) {
-  final parentContext = context;
   final messageCtrl = TextEditingController();
   String selectedTarget = fixedHotelKey ?? 'all';
 
@@ -432,7 +442,7 @@ void showBroadcastSheet(BuildContext context, String senderName, {String? fixedH
               style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
               icon: const Icon(Icons.send),
               label: const Text('Send Priority Alert'),
-              onPressed: () => _confirmBroadcast(parentContext, senderName, messageCtrl.text, selectedTarget),
+              onPressed: () => _confirmBroadcast(context, senderName, messageCtrl.text, selectedTarget),
             ),
             const SizedBox(height: 30),
           ],
@@ -466,6 +476,9 @@ Widget _buildHotelTargetDropdown(String selected, Function(String?) onChanged) {
 void _confirmBroadcast(BuildContext context, String sender, String message, String target) {
   if (message.trim().isEmpty) return;
 
+  // 1. Capture the navigator for the bottom sheet before the async gap
+  final sheetNavigator = Navigator.of(context);
+
   showDialog(
     context: context,
     builder: (dContext) => AlertDialog(
@@ -486,11 +499,21 @@ void _confirmBroadcast(BuildContext context, String sender, String message, Stri
 
             await FirebaseFirestore.instance.collection('broadcasts').add(broadcast.toMap());
 
+            // 2. Check if the dialog context is still valid before popping the dialog
+            if (!dContext.mounted) return;
+            Navigator.pop(dContext);
+
+            // 3. Use the captured navigator to pop the bottom sheet
+            sheetNavigator.pop();
+            
+            // 4. Use the original context with a mounted guard for the SnackBar
             if (context.mounted) {
-              Navigator.pop(dContext);
-              Navigator.pop(context);
               ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Broadcast sent'), backgroundColor: Colors.green));
+                const SnackBar(
+                  content: Text('Broadcast sent'), 
+                  backgroundColor: Colors.green,
+                ),
+              );
             }
           },
           child: const Text('Yes'),
