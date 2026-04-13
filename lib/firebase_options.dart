@@ -85,4 +85,5 @@ class DefaultFirebaseOptions {
     storageBucket: 'rcts-pwa-2027.firebasestorage.app',
     measurementId: 'G-PCL8MN5S64',
   );
+
 }

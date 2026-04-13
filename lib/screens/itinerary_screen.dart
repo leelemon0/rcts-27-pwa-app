@@ -50,13 +50,45 @@ class _ItineraryScreenState extends State<ItineraryScreen>
     }
   }
 
-  void _handleLogout() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('user_ref');
+void _handleLogout() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: const Color(0xFF001436),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          title: const Text(
+            'Confirm Logout',
+            style: TextStyle(color: Color(0xFFFFD700)),
+          ),
+          content: const Text(
+            'Are you sure you want to sign out?',
+            style: TextStyle(color: Colors.white70),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('CANCEL', style: TextStyle(color: Colors.white38)),
+            ),
+            TextButton(
+              onPressed: () async {
+                final prefs = await SharedPreferences.getInstance();
+                await prefs.remove('user_ref');
+                
+                // Guard the async gap: ensure the dialog/screen is still present
+                if (!context.mounted) return; 
 
-    if (mounted) {
-      Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
-    }
+                Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
+              },
+              child: const Text(
+                'LOGOUT',
+                style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   @override
@@ -147,6 +179,28 @@ class _ItineraryScreenState extends State<ItineraryScreen>
                       const SizedBox(height: 16),
                     ],
                     _buildHotelCard(user, liveHotel),
+                    if (liveHotel?.hotelType == 'glamping' || liveHotel?.hotelType == 'cruise') ...[
+                      const SizedBox(height: 16),
+                      ItineraryCard(
+                        title: 'All-Inclusive Experience Guide',
+                        subtitle: 'Everything included in your stay',
+                        icon: Icons.auto_awesome_outlined,
+                        details: Text(
+                          liveHotel?.experienceGuide ?? 'Guide information will be available shortly.',
+                          style: const TextStyle(color: Colors.white70, height: 1.4),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      ItineraryCard(
+                        title: '${liveHotel?.hotelName} Entertainment',
+                        subtitle: 'Daily activities & shows',
+                        icon: Icons.theater_comedy_outlined,
+                        details: Text(
+                          liveHotel?.entertainmentSchedule ?? 'Schedule will be updated soon.',
+                          style: const TextStyle(color: Colors.white70, height: 1.4),
+                        ),
+                      ),
+                    ],
                     if (user.hasTransport) ...[
                       const SizedBox(height: 16),
                       ItineraryCard(
@@ -158,6 +212,11 @@ class _ItineraryScreenState extends State<ItineraryScreen>
                           pickup: liveHotel?.pickup ?? widget.clientData.pickup,
                           hotelKey: user.hotelKey,
                           reference: user.ref,
+                          // Pass the schedules here
+                          thu: liveHotel?.transportThursday,
+                          fri: liveHotel?.transportFriday,
+                          sat: liveHotel?.transportSaturday,
+                          sun: liveHotel?.transportSunday,
                         ),
                       ),
                     ],

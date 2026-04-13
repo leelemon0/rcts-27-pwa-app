@@ -4,6 +4,7 @@ import '../models/user.dart';
 import '../models/hotel.dart';
 import '../widgets/modal_sheets.dart';
 import '../widgets/room_card_widget.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class HotelManagerDashboard extends StatefulWidget {
   final User managerData;
@@ -25,8 +26,6 @@ class _HotelManagerDashboardState extends State<HotelManagerDashboard>
   Widget build(BuildContext context) {
     super.build(context);
 
-    // 1. Resolve which hotels this manager can see.
-    // This logic handles both pre-parsed lists and raw comma-separated strings.
     final List<String> managerHotelKeys = [];
 
     if (widget.managerData.hotelKeys != null && widget.managerData.hotelKeys!.isNotEmpty) {
@@ -34,16 +33,12 @@ class _HotelManagerDashboardState extends State<HotelManagerDashboard>
     } else if (widget.managerData.hotelKey != null && widget.managerData.hotelKey!.isNotEmpty) {
       final raw = widget.managerData.hotelKey!;
       if (raw.contains(',')) {
-        // Splits "hotel1, hotel2" into ["hotel1", "hotel2"]
         managerHotelKeys.addAll(raw.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty));
       } else {
         managerHotelKeys.add(raw);
       }
     }
 
-    debugPrint("Fetching hotels for: $managerHotelKeys");
-
-    // 2. Fetch Hotel Documents
     final Stream<List<DocumentSnapshot<Map<String, dynamic>>>> hotelStream = managerHotelKeys.isEmpty
         ? Stream.value([])
         : FirebaseFirestore.instance
@@ -62,7 +57,6 @@ class _HotelManagerDashboardState extends State<HotelManagerDashboard>
           );
         }
 
-        // Error state if no hotels match the keys provided
         if (!hotelsSnapshot.hasData || hotelsSnapshot.data!.isEmpty) {
           return _buildErrorState(
             "No valid hotel documents found for: ${managerHotelKeys.join(', ')}",
@@ -74,7 +68,6 @@ class _HotelManagerDashboardState extends State<HotelManagerDashboard>
             .map((doc) => Hotel.fromMap(doc.id, doc.data()!))
             .toList();
 
-        // Initialise or validate selectedHotelKey
         if (selectedHotelKey == null || !hotels.any((h) => h.key == selectedHotelKey)) {
           selectedHotelKey = hotels[0].key;
         }
@@ -84,7 +77,6 @@ class _HotelManagerDashboardState extends State<HotelManagerDashboard>
           orElse: () => hotels.first,
         );
 
-        // 3. Fetch Guests for the SELECTED hotel
         return StreamBuilder<QuerySnapshot>(
           key: ValueKey(selectedHotel.key),
           stream: FirebaseFirestore.instance
@@ -103,7 +95,6 @@ class _HotelManagerDashboardState extends State<HotelManagerDashboard>
                     .map((doc) => User.fromMap(doc.id, doc.data() as Map<String, dynamic>))
                     .toList() ?? [];
 
-            // Grouping Logic by Room
             final Map<String, List<User>> roomGroups = {};
             for (final guest in allGuests) {
               final roomKey = guest.roomID ?? 'Unassigned';
@@ -121,6 +112,25 @@ class _HotelManagerDashboardState extends State<HotelManagerDashboard>
                 backgroundColor: const Color(0xFF001436),
                 title: _buildAppBarTitle(selectedHotel),
                 actions: [
+                  IconButton(
+                    icon: const Icon(Icons.edit_note, color: Color(0xFFFFD700)),
+                    tooltip: 'Edit Hotel Logistics',
+                    onPressed: () => showEditHotelSheet(
+                      context, 
+                      selectedHotel, 
+                      () => setState(() {}),
+                      canEditManager: false, // Managers cannot reassign themselves/others
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.search, color: Color(0xFFFFD700)),
+                    onPressed: () {
+                      showSearch(
+                        context: context,
+                        delegate: GuestSearchDelegate(limitToHotels: managerHotelKeys),
+                      );
+                    },
+                  ),
                   if (hotels.length > 1) _buildHotelDropdown(hotels),
                   _buildLogoutButton(context),
                 ],
@@ -133,6 +143,10 @@ class _HotelManagerDashboardState extends State<HotelManagerDashboard>
                       delegate: SliverChildListDelegate([
                         Text(
                           'Current Transport: ${selectedHotel.transport}',
+                          style: const TextStyle(color: Colors.white70, fontSize: 12),
+                        ),
+                        Text(
+                          'Pickup Location: ${selectedHotel.pickup}',
                           style: const TextStyle(color: Colors.white70, fontSize: 12),
                         ),
                         const SizedBox(height: 16),
@@ -208,7 +222,45 @@ class _HotelManagerDashboardState extends State<HotelManagerDashboard>
   Widget _buildLogoutButton(BuildContext context) {
     return IconButton(
       icon: const Icon(Icons.logout, color: Color(0xFFFFD700)),
-      onPressed: () => Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false),
+      onPressed: () {
+        showDialog(
+          context: context,
+          builder: (BuildContext context) {
+            return AlertDialog(
+              backgroundColor: const Color(0xFF001436),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              title: const Text(
+                'Confirm Logout',
+                style: TextStyle(color: Color(0xFFFFD700)),
+              ),
+              content: const Text(
+                'Are you sure you want to exit?',
+                style: TextStyle(color: Colors.white70),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('CANCEL', style: TextStyle(color: Colors.white38)),
+                ),
+                TextButton(
+                  onPressed: () async {
+                    final prefs = await SharedPreferences.getInstance();
+                    await prefs.remove('user_ref');
+                    
+                    if (!context.mounted) return;
+
+                    Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
+                  },
+                  child: const Text(
+                    'LOGOUT',
+                    style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 
@@ -231,7 +283,8 @@ class _HotelManagerDashboardState extends State<HotelManagerDashboard>
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        actions: [_buildLogoutButton(context)],
+        actions: [
+          _buildLogoutButton(context)],
       ),
       body: Center(
         child: Padding(
@@ -242,6 +295,141 @@ class _HotelManagerDashboardState extends State<HotelManagerDashboard>
             style: const TextStyle(color: Colors.white54, fontSize: 16),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class GuestSearchDelegate extends SearchDelegate {
+  /// If null, searches all guests (Admin). 
+  /// If provided, restricts results to these hotel keys (Manager).
+  final List<String>? limitToHotels;
+
+  GuestSearchDelegate({this.limitToHotels});
+
+@override
+  List<Widget>? buildActions(BuildContext context) {
+    return [
+      // Only show the button if there is text to clear
+      if (query.isNotEmpty)
+        Padding(
+          padding: const EdgeInsets.only(right: 8.0),
+          child: Center(
+            child: TextButton(
+              onPressed: () => query = '',
+              child: const Text(
+                'CLEAR',
+                style: TextStyle(
+                  color: Color(0xFFFFD700), // Matching your gold accent color
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
+                ),
+              ),
+            ),
+          ),
+        ),
+    ];
+  }
+
+  @override
+  Widget? buildLeading(BuildContext context) {
+    return IconButton(
+      icon: const Icon(Icons.arrow_back),
+      onPressed: () => close(context, null),
+    );
+  }
+
+  @override
+  Widget buildResults(BuildContext context) => _buildSearchResults();
+
+  @override
+  Widget buildSuggestions(BuildContext context) => _buildSearchResults();
+
+  Widget _buildSearchResults() {
+    if (query.length < 2) {
+      return const Center(
+        child: Text("Enter at least 2 characters to search...",
+            style: TextStyle(color: Colors.white54)),
+      );
+    }
+
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance.collection('guests').snapshots(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) return const SizedBox();
+
+        final results = snapshot.data!.docs.where((doc) {
+          final data = doc.data() as Map<String, dynamic>;
+          
+          // 1. Security Scope Check
+          if (limitToHotels != null && !limitToHotels!.contains(data['hotelKey'])) {
+            return false;
+          }
+
+          // 2. Search logic
+          final name = (data['name'] ?? '').toString().toLowerCase();
+          final email = (data['email'] ?? '').toString().toLowerCase();
+          final searchLower = query.toLowerCase();
+          return name.contains(searchLower) || email.contains(searchLower);
+        }).toList();
+
+        if (results.isEmpty) {
+          return const Center(
+            child: Text("No guests found matching that search.",
+                style: TextStyle(color: Colors.white54)),
+          );
+        }
+
+        return ListView.builder(
+          itemCount: results.length,
+          itemBuilder: (context, index) {
+            final guest = User.fromMap(
+                results[index].id, results[index].data() as Map<String, dynamic>);
+
+            return ListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+              title: Text(guest.name,
+                  style: const TextStyle(
+                      color: Color(0xFFFFD700), fontWeight: FontWeight.bold)),
+              subtitle: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(guest.email, style: const TextStyle(color: Colors.white70)),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      const Icon(Icons.hotel, size: 14, color: Colors.white38),
+                      const SizedBox(width: 4),
+                      Text("Hotel: ${guest.hotelKey ?? 'Unassigned'}",
+                          style: const TextStyle(color: Colors.white38, fontSize: 12)),
+                      const SizedBox(width: 12),
+                      const Icon(Icons.door_front_door, size: 14, color: Colors.white38),
+                      const SizedBox(width: 4),
+                      Text("Room: ${guest.roomID ?? 'N/A'}",
+                          style: const TextStyle(color: Colors.white38, fontSize: 12)),
+                    ],
+                  ),
+                ],
+              ),
+              isThreeLine: true,
+              onTap: () => close(context, null),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  @override
+  ThemeData appBarTheme(BuildContext context) {
+    return Theme.of(context).copyWith(
+      appBarTheme: const AppBarTheme(backgroundColor: Color(0xFF001436)),
+      inputDecorationTheme: const InputDecorationTheme(
+        hintStyle: TextStyle(color: Colors.white38),
+        border: InputBorder.none,
+      ),
+      textTheme: const TextTheme(
+        titleLarge: TextStyle(color: Colors.white),
       ),
     );
   }

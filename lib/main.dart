@@ -1,7 +1,8 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:cloud_firestore/cloud_firestore.dart'; // ADD THIS
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:firebase_remote_config/firebase_remote_config.dart'; // Add this
+import 'package:firebase_remote_config/firebase_remote_config.dart';
 import 'firebase_options.dart';
 import 'screens/login_screen.dart';
 import 'dart:async';
@@ -15,6 +16,12 @@ void main() async {
   
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
+  );
+
+// --- CLOUD FIRESTORE OFFLINE PERSISTENCE ---
+  FirebaseFirestore.instance.settings = const Settings(
+    persistenceEnabled: true,
+    cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
   );
 
   // --- REMOTE CONFIG WARM UP ---
@@ -82,22 +89,13 @@ class _AuthWrapperState extends State<AuthWrapper> {
 
   Future<void> _checkLoginStatus() async {
     try {
-      // 2. Warm up Remote Config inside the wrapper instead of main()
-      final remoteConfig = FirebaseRemoteConfig.instance;
-      await remoteConfig.fetchAndActivate();
-
       final prefs = await SharedPreferences.getInstance();
       final String? savedRef = prefs.getString('user_ref');
 
-      // 3. Give the UI one last second to settle
-      await Future.delayed(const Duration(seconds: 1));
-
       if (!mounted) return;
-      
-      // Stop the nudge timer before moving away
-      _nudgeTimer?.cancel();
 
       if (savedRef != null) {
+        // We have a ref! Go straight to LoginScreen for auto-login
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (_) => LoginScreen(autoLoginRef: savedRef)),
         );
@@ -105,8 +103,6 @@ class _AuthWrapperState extends State<AuthWrapper> {
         Navigator.of(context).pushReplacementNamed('/login');
       }
     } catch (e) {
-      debugPrint("Init Error: $e");
-      // Even if it fails, navigate to login so the user isn't stuck
       Navigator.of(context).pushReplacementNamed('/login');
     }
   }

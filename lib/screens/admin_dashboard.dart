@@ -7,6 +7,7 @@ import '../widgets/hotel_card_widget.dart';
 import '../widgets/staff_list_item_widget.dart';
 import '../services/admin_dashboard_service.dart';
 import 'admin_room_manifest_view.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class AdminDashboard extends StatefulWidget {
   const AdminDashboard({super.key});
@@ -23,6 +24,47 @@ class _AdminDashboardState extends State<AdminDashboard> with SingleTickerProvid
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+  }
+
+  // ADD THIS METHOD
+  void _handleLogout() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: const Color(0xFF001436),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          title: const Text(
+            'Confirm Logout',
+            style: TextStyle(color: Color(0xFFFFD700)),
+          ),
+          content: const Text(
+            'Are you sure you want to exit?',
+            style: TextStyle(color: Colors.white70),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('CANCEL', style: TextStyle(color: Colors.white38)),
+            ),
+            TextButton(
+              onPressed: () async {
+                final prefs = await SharedPreferences.getInstance();
+                await prefs.remove('user_ref');
+                
+                if (!context.mounted) return;
+
+                Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
+              },
+              child: const Text(
+                'LOGOUT',
+                style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   @override
@@ -50,8 +92,18 @@ class _AdminDashboardState extends State<AdminDashboard> with SingleTickerProvid
         ),
         actions: [
           IconButton(
+            icon: const Icon(Icons.search),
+            onPressed: () {
+              showSearch(
+                context: context,
+                delegate: GuestSearchDelegate(),
+              );
+            },
+          ),
+          IconButton(
             icon: const Icon(Icons.logout),
-            onPressed: () => Navigator.pushReplacementNamed(context, '/login'),
+            // UPDATE THIS LINE
+            onPressed: _handleLogout, 
           ),
         ],
       ),
@@ -200,20 +252,25 @@ class _HotelTabViewState extends State<_HotelTabView>
 
   Widget _buildHotelHeader() {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(16), // Added consistent padding
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          const Text(
-            'Master Hotel List',
-            style: TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFFFFD700),
+          // FIX: Wrap the title in Expanded to prevent horizontal overflow
+          Expanded(
+            child: Text(
+              'Master Hotel List',
+              overflow: TextOverflow.ellipsis, // Adds '...' if space is too tight
+              style: const TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFFFFD700),
+              ),
             ),
           ),
+          const SizedBox(width: 8), // Add a small gap between title and chip
           FilterChip(
-            label: const Text('View Unassigned Hotels Only'),
+            label: const Text('Unassigned Only'), // Shortened label slightly to save space
             selected: _showUnmanagedOnly,
             selectedColor: Colors.redAccent.withValues(alpha: 0.3),
             checkmarkColor: Colors.redAccent,
@@ -276,6 +333,130 @@ class _StaffTabViewState extends State<_StaffTabView>
           },
         );
       },
+    );
+  }
+}
+
+class GuestSearchDelegate extends SearchDelegate {
+@override
+  List<Widget>? buildActions(BuildContext context) {
+    return [
+      // Only show the button if there is text to clear
+      if (query.isNotEmpty)
+        Padding(
+          padding: const EdgeInsets.only(right: 8.0),
+          child: Center(
+            child: TextButton(
+              onPressed: () => query = '',
+              child: const Text(
+                'CLEAR',
+                style: TextStyle(
+                  color: Color(0xFFFFD700), // Matching your gold accent color
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
+                ),
+              ),
+            ),
+          ),
+        ),
+    ];
+  }
+
+  @override
+  Widget? buildLeading(BuildContext context) {
+    return IconButton(
+      icon: const Icon(Icons.arrow_back),
+      onPressed: () => close(context, null),
+    );
+  }
+
+  @override
+  Widget buildResults(BuildContext context) => _buildSearchResults();
+
+  @override
+  Widget buildSuggestions(BuildContext context) => _buildSearchResults();
+
+  Widget _buildSearchResults() {
+    if (query.length < 2) {
+      return const Center(
+        child: Text("Enter at least 2 characters to search...",
+            style: TextStyle(color: Colors.white54)),
+      );
+    }
+
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance.collection('guests').snapshots(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) return const SizedBox();
+
+        final results = snapshot.data!.docs.where((doc) {
+          final data = doc.data() as Map<String, dynamic>;
+          final name = (data['name'] ?? '').toString().toLowerCase();
+          final email = (data['email'] ?? '').toString().toLowerCase();
+          final searchLower = query.toLowerCase();
+          return name.contains(searchLower) || email.contains(searchLower);
+        }).toList();
+
+        if (results.isEmpty) {
+          return const Center(
+            child: Text("No guests found matching that search.",
+                style: TextStyle(color: Colors.white54)),
+          );
+        }
+
+        return ListView.builder(
+          itemCount: results.length,
+          itemBuilder: (context, index) {
+            final guest = User.fromMap(
+                results[index].id, results[index].data() as Map<String, dynamic>);
+
+            return ListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+              title: Text(guest.name, 
+                  style: const TextStyle(color: Color(0xFFFFD700), fontWeight: FontWeight.bold)),
+              subtitle: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(guest.email, style: const TextStyle(color: Colors.white70)),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      const Icon(Icons.hotel, size: 14, color: Colors.white38),
+                      const SizedBox(width: 4),
+                      Text("Hotel: ${guest.hotelKey ?? 'Unassigned'}", 
+                          style: const TextStyle(color: Colors.white38, fontSize: 12)),
+                      const SizedBox(width: 12),
+                      const Icon(Icons.door_front_door, size: 14, color: Colors.white38),
+                      const SizedBox(width: 4),
+                      Text("Room: ${guest.roomID ?? 'N/A'}", 
+                          style: const TextStyle(color: Colors.white38, fontSize: 12)),
+                    ],
+                  ),
+                ],
+              ),
+              isThreeLine: true,
+              onTap: () {
+                close(context, null);
+              },
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // Ensure the search page matches your dark theme
+  @override
+  ThemeData appBarTheme(BuildContext context) {
+    return Theme.of(context).copyWith(
+      appBarTheme: const AppBarTheme(backgroundColor: Color(0xFF001436)),
+      inputDecorationTheme: const InputDecorationTheme(
+        hintStyle: TextStyle(color: Colors.white38),
+        border: InputBorder.none,
+      ),
+      textTheme: const TextTheme(
+        titleLarge: TextStyle(color: Colors.white),
+      ),
     );
   }
 }

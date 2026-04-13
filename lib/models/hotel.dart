@@ -10,7 +10,14 @@ class Hotel {
   final String pickup;
   final String checkIn;
   final String checkOut;
-  final String? coordinates; // New Field
+  final String? coordinates;
+  final String? transportThursday;
+  final String? transportFriday;
+  final String? transportSaturday;
+  final String? transportSunday;
+  final String? hotelType; // 'Glamping', 'Cruise', or null
+  final String? experienceGuide;
+  final String? entertainmentSchedule;
 
   const Hotel({
     required this.key,
@@ -22,7 +29,14 @@ class Hotel {
     required this.pickup,
     required this.checkIn,
     required this.checkOut,
-    this.coordinates, // New Field
+    this.coordinates,
+    this.transportThursday,
+    this.transportFriday,
+    this.transportSaturday,
+    this.transportSunday,
+    this.hotelType,
+    this.experienceGuide,
+    this.entertainmentSchedule,
   });
 
   Map<String, dynamic> toMap() {
@@ -35,7 +49,14 @@ class Hotel {
       'pickup': pickup,
       'checkIn': checkIn,
       'checkOut': checkOut,
-      'coordinates': coordinates, // New Field
+      'coordinates': coordinates,
+      'transportThursday': transportThursday,
+      'transportFriday': transportFriday,
+      'transportSaturday': transportSaturday,
+      'transportSunday': transportSunday,
+      'hotelType': hotelType,
+      'experienceGuide': experienceGuide,
+      'entertainmentSchedule': entertainmentSchedule,
     };
   }
 
@@ -45,7 +66,14 @@ class Hotel {
     String? board,
     String? checkIn,
     String? checkOut,
-    String? coordinates, // New Field
+    String? coordinates,
+    String? transportThursday,
+    String? transportFriday,
+    String? transportSaturday,
+    String? transportSunday,
+    String? hotelType,
+    String? experienceGuide,
+    String? entertainmentSchedule,
   }) {
     return Hotel(
       key: key,
@@ -57,21 +85,26 @@ class Hotel {
       pickup: pickup ?? this.pickup,
       checkIn: checkIn ?? this.checkIn,
       checkOut: checkOut ?? this.checkOut,
-      coordinates: coordinates ?? this.coordinates, // New Field
+      coordinates: coordinates ?? this.coordinates,
+      transportThursday: transportThursday ?? this.transportThursday,
+      transportFriday: transportFriday ?? this.transportFriday,
+      transportSaturday: transportSaturday ?? this.transportSaturday,
+      transportSunday: transportSunday ?? this.transportSunday,
+      hotelType: hotelType ?? this.hotelType,
+      experienceGuide: experienceGuide ?? this.experienceGuide,
+      entertainmentSchedule: entertainmentSchedule ?? this.entertainmentSchedule,
     );
   }
 
-factory Hotel.fromMap(String key, Map<String, dynamic> data) {
-  // Extract coordinates safely
-  String? coordsString;
-  final coordsData = data['coordinates'];
+  factory Hotel.fromMap(String key, Map<String, dynamic> data) {
+    String? coordsString;
+    final coordsData = data['coordinates'];
 
-  if (coordsData is GeoPoint) {
-    // Convert native GeoPoint to "lat,long" string for the URL launcher
-    coordsString = '${coordsData.latitude},${coordsData.longitude}';
-  } else if (coordsData is String) {
-    coordsString = coordsData;
-  }
+    if (coordsData is GeoPoint) {
+      coordsString = '${coordsData.latitude},${coordsData.longitude}';
+    } else if (coordsData is String) {
+      coordsString = coordsData;
+    }
 
     return Hotel(
       key: key,
@@ -83,7 +116,15 @@ factory Hotel.fromMap(String key, Map<String, dynamic> data) {
       pickup: data['pickup'] as String? ?? '',
       checkIn: data['checkIn'] as String? ?? '',
       checkOut: data['checkOut'] as String? ?? '',
-      coordinates: coordsString, // Now it correctly receives a String
+      coordinates: coordsString,
+      transportThursday: data['transportThursday'] as String?,
+      transportFriday: data['transportFriday'] as String?,
+      transportSaturday: data['transportSaturday'] as String?,
+      transportSunday: data['transportSunday'] as String?,
+      // Use null if empty string or missing to simplify UI logic
+      hotelType: data['hotelType']?.toString().isEmpty ?? true ? null : data['hotelType'],
+      experienceGuide: data['experienceGuide'] as String?,
+      entertainmentSchedule: data['entertainmentSchedule'] as String?,
     );
   }
 }

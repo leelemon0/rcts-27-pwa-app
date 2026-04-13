@@ -151,20 +151,33 @@ class AdminRoomManifestView extends StatelessWidget {
             child: Text(
               guest.name,
               style: const TextStyle(color: Colors.white, fontSize: 14),
+              // Add overflow handling to the name
+              overflow: TextOverflow.ellipsis, 
+              maxLines: 1,
             ),
           ),
-          // Conditional Icons for Ticket and Transport
-          if (guest.hasTicket) ...[
-            const Icon(Icons.confirmation_number, size: 14, color: Color(0xFFFFD700)),
-            const SizedBox(width: 6),
-          ],
-          if (guest.hasTransport) ...[
-            const Icon(Icons.directions_bus, size: 14, color: Color(0xFFFFD700)),
-            const SizedBox(width: 6),
-          ],
-          Text(
-            guest.ref ?? '',
-            style: const TextStyle(fontSize: 10, color: Colors.white38, letterSpacing: 0.5),
+          const SizedBox(width: 8), // Added spacing
+          // Wrap trailing elements in a Row with mainAxisSize: MainAxisSize.min
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (guest.hasTicket) ...[
+                const Icon(Icons.confirmation_number, size: 14, color: Color(0xFFFFD700)),
+                const SizedBox(width: 6),
+              ],
+              if (guest.hasTransport) ...[
+                const Icon(Icons.directions_bus, size: 14, color: Color(0xFFFFD700)),
+                const SizedBox(width: 6),
+              ],
+              Text(
+                guest.ref ?? '',
+                style: const TextStyle(
+                  fontSize: 10, 
+                  color: Colors.white38, 
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ],
           ),
         ],
       ),

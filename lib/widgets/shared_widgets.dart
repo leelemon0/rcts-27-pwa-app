@@ -342,8 +342,9 @@ class HotelDetails extends StatelessWidget {
 class TransportDetails extends StatelessWidget {
   final String? pickup;
   final String? vehicle;
-  final String? hotelKey; // Pass this in
-  final String? reference; // Pass this in
+  final String? hotelKey;
+  final String? reference;
+  final String? thu, fri, sat, sun;
 
   const TransportDetails({
     super.key, 
@@ -351,11 +352,14 @@ class TransportDetails extends StatelessWidget {
     required this.pickup,
     this.hotelKey,
     this.reference,
+    this.thu,
+    this.fri,
+    this.sat,
+    this.sun,
   });
 
   @override
   Widget build(BuildContext context) {
-    // Combine data for the barcode: e.g., "ADARE-RC12345"
     final String barcodeData = '${hotelKey ?? 'NA'}-${reference ?? '0000'}';
 
     return Column(
@@ -364,7 +368,30 @@ class TransportDetails extends StatelessWidget {
         const SizedBox(height: 8),
         Text('Pickup Location: ${pickup ?? 'N/A'}', style: const TextStyle(color: Colors.white)),
         Text('Vehicle: ${vehicle ?? 'N/A'}', style: const TextStyle(color: Colors.white70)),
+        
         const SizedBox(height: 20),
+        const Text(
+          'DAILY SHUTTLE TIMES',
+          style: TextStyle(
+            fontSize: 10, 
+            fontWeight: FontWeight.bold, 
+            color: Color(0xFFFFD700), 
+            letterSpacing: 1.2
+          ),
+        ),
+        const SizedBox(height: 8),
+        
+        // Schedule Tiles Row
+        Row(
+          children: [
+            _buildScheduleTile('THURSDAY', thu),
+            _buildScheduleTile('FRIDAY', fri),
+            _buildScheduleTile('SATURDAY', sat),
+            _buildScheduleTile('SUNDAY', sun),
+          ],
+        ),
+
+        const SizedBox(height: 24),
         
         // Barcode Section
         Center(
@@ -373,15 +400,15 @@ class TransportDetails extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 decoration: BoxDecoration(
-                  color: Colors.white, // High contrast for scanners
+                  color: Colors.white,
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: BarcodeWidget(
-                  barcode: Barcode.code128(), // Standard 1D barcode
+                  barcode: Barcode.code128(),
                   data: barcodeData,
                   width: 220,
                   height: 70,
-                  drawText: false, // Text displayed separately for styling
+                  drawText: false,
                 ),
               ),
               const SizedBox(height: 8),
@@ -398,6 +425,59 @@ class TransportDetails extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+
+  // Helper method to build individual day tiles
+  Widget _buildScheduleTile(String day, String? time) {
+    // 1. Define unique defaults for each day
+    final Map<String, String> defaultSchedules = {
+      'THURSDAY': 'Departures 08:00, 09:00\nReturn 19:00',
+      'FRIDAY': 'Departures 05:00, 06:00\nReturn 18:30',
+      'SATURDAY': 'Departures 05:00, 06:00\nReturn 18:30',
+      'SUNDAY': 'Departures 09:00, 10:00\nReturn 18:00',
+    };
+
+    // 2. Determine display text
+    String displayTime;
+    if (time == null || time.isEmpty) {
+      // Use the specific day's default, or a generic fallback if day is not found in map
+      displayTime = defaultSchedules[day] ?? 'No Schedule\nConfigured';
+    } else {
+      // If data exists but you want to force it onto two lines at the hyphen:
+      displayTime = time.replaceAll(' - ', '\n');
+    }
+
+    return Expanded(
+      child: Container(
+        margin: const EdgeInsets.only(right: 6),
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4), // Added horizontal padding
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.05),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.white10),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              day.toUpperCase(), 
+              style: const TextStyle(fontSize: 9, color: Colors.white38, fontWeight: FontWeight.bold)
+            ),
+            const SizedBox(height: 6),
+            Text(
+              displayTime,
+              textAlign: TextAlign.center, // Ensure multi-line text is centred
+              style: const TextStyle(
+                fontSize: 10, // Slightly smaller to accommodate two lines comfortably
+                fontWeight: FontWeight.bold, 
+                color: Colors.white,
+                height: 1.2, // Adjust line spacing
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
