@@ -165,7 +165,7 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _isMagicLinkLoading = true);
     try {
       var acs = fb_auth.ActionCodeSettings(
-        url: "http://localhost:5000", 
+        url: "http://leelemon0.github.io/rcts-27-pwa-app/", 
         handleCodeInApp: true,
         androidPackageName: "com.rcts.app",
         androidInstallApp: true,
