@@ -37,7 +37,6 @@ class _EditHotelForm extends StatefulWidget {
 }
 
 class _EditHotelFormState extends State<_EditHotelForm> {
-  // Controllers persist here to prevent keyboard focus loss
   late TextEditingController transportCtrl;
   late TextEditingController pickupCtrl;
   late TextEditingController boardCtrl;
@@ -174,7 +173,6 @@ class _EditHotelFormState extends State<_EditHotelForm> {
                   transportSunday: sunCtrl.text.trim(),
                 );
 
-                // Capture navigator before async gap
                 final navigator = Navigator.of(context);
 
                 await FirebaseFirestore.instance
@@ -184,7 +182,6 @@ class _EditHotelFormState extends State<_EditHotelForm> {
 
                 widget.onSave();
                 
-                // Guard navigation with mounted check
                 if (!mounted) return;
                 navigator.pop();
               },
@@ -201,11 +198,15 @@ class _EditHotelFormState extends State<_EditHotelForm> {
     return Theme(
       data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
       child: ExpansionTile(
-        key: PageStorageKey('section_$index'),
-        initiallyExpanded: expandedIndex == index,
-        onExpansionChanged: (isExpanded) {
-          setState(() => expandedIndex = isExpanded ? index : 0);
-        },
+        key: ValueKey('section_$index'),
+        
+        // FIX 1: Keeps the heavy TextFields alive in memory even when collapsed.
+        // This stops the UI from stuttering when it tries to render them on the fly.
+        maintainState: true, 
+
+        // FIX 2: Removed initiallyExpanded and onExpansionChanged containing setState.
+        // The tile now handles its own state without rebuilding the entire form.
+        
         tilePadding: EdgeInsets.zero,
         iconColor: const Color(0xFFFFD700),
         collapsedIconColor: Colors.white54,
@@ -218,18 +219,31 @@ class _EditHotelFormState extends State<_EditHotelForm> {
     );
   }
 
-  Widget _buildField(TextEditingController controller, String label, {int maxLines = 1}) {
+  Widget _buildField(TextEditingController controller, String label, {int? maxLines = 1}) {
     return TextField(
+      // Unique key prevents state restoration conflicts
+      key: ValueKey('field_${label.replaceAll(' ', '_')}'), 
       controller: controller,
-      maxLines: maxLines,
+      maxLines: maxLines, 
+      expands: false, 
+      // FIX: restorationId must be null to prevent the bool-to-double type error in nested scrollables
+      restorationId: null, 
+      // FIX: Force ClampingScrollPhysics to avoid framework-level scroll offset calculations on web
+      scrollPhysics: const ClampingScrollPhysics(), 
       style: const TextStyle(color: Colors.white, fontSize: 14),
       decoration: InputDecoration(
         labelText: label,
         labelStyle: const TextStyle(color: Colors.white38),
         filled: true,
         fillColor: Colors.white.withAlpha(13),
-        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFFFD700))),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12), 
+          borderSide: BorderSide.none,
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12), 
+          borderSide: const BorderSide(color: Color(0xFFFFD700)),
+        ),
       ),
     );
   }
@@ -427,9 +441,12 @@ void showBroadcastSheet(BuildContext context, String senderName, {String? fixedH
               }),
               const SizedBox(height: 16),
             ],
+            // Applied fix to Broadcast message field as well
             TextField(
               controller: messageCtrl,
               maxLines: 3,
+              restorationId: null,
+              scrollPhysics: const ClampingScrollPhysics(),
               style: const TextStyle(color: Colors.white),
               decoration: const InputDecoration(
                   hintText: 'Enter message...',
@@ -476,7 +493,6 @@ Widget _buildHotelTargetDropdown(String selected, Function(String?) onChanged) {
 void _confirmBroadcast(BuildContext context, String sender, String message, String target) {
   if (message.trim().isEmpty) return;
 
-  // 1. Capture the navigator for the bottom sheet before the async gap
   final sheetNavigator = Navigator.of(context);
 
   showDialog(
@@ -499,14 +515,11 @@ void _confirmBroadcast(BuildContext context, String sender, String message, Stri
 
             await FirebaseFirestore.instance.collection('broadcasts').add(broadcast.toMap());
 
-            // 2. Check if the dialog context is still valid before popping the dialog
             if (!dContext.mounted) return;
             Navigator.pop(dContext);
 
-            // 3. Use the captured navigator to pop the bottom sheet
             sheetNavigator.pop();
             
-            // 4. Use the original context with a mounted guard for the SnackBar
             if (context.mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
