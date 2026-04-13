@@ -382,10 +382,10 @@ class TransportDetails extends StatelessWidget {
           physics: const BouncingScrollPhysics(),
           child: Row(
             children: [
-              _buildScheduleTile('Thursday', thu),
-              _buildScheduleTile('Friday', fri),
-              _buildScheduleTile('Saturday', sat),
-              _buildScheduleTile('Sunday', sun),
+              _buildScheduleTile('Thursday 16 Sept', thu),
+              _buildScheduleTile('Friday 17 Sept', fri),
+              _buildScheduleTile('Saturday 18 Sept', sat),
+              _buildScheduleTile('Sunday 19 Sept', sun),
             ],
           ),
         ),
@@ -439,7 +439,7 @@ class TransportDetails extends StatelessWidget {
         : time.replaceAll(' - ', '\n');
 
     return InfoCard(
-      title: day.toUpperCase(),
+      title: day,
       subtitle: displayTime,
       width: 150,
     );
