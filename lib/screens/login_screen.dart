@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_auth/firebase_auth.dart' as fb_auth;
+import 'package:web/web.dart' as web;
 
 import '../models/user.dart';
 import '../models/client_data.dart';
@@ -38,37 +39,50 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _handleIncomingLink() async {
-    final fb_auth.FirebaseAuth auth = fb_auth.FirebaseAuth.instance;
-    if (auth.isSignInWithEmailLink(Uri.base.toString())) {
-      setState(() => _isLoading = true);
-      try {
-        final prefs = await SharedPreferences.getInstance();
-        String? email = prefs.getString('user_email_for_login');
-        email ??= _emailController.text.trim().toLowerCase();
+  final fb_auth.FirebaseAuth auth = fb_auth.FirebaseAuth.instance;
+  final String currentUrl = Uri.base.toString();
+  
+  if (auth.isSignInWithEmailLink(currentUrl)) {
+    setState(() => _isLoading = true);
+    
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      String? email = prefs.getString('user_email_for_login');
+      email ??= _emailController.text.trim().toLowerCase();
 
-        if (email.isEmpty) throw 'Please enter your email to confirm sign-in.';
+      if (email.isEmpty) throw 'Please enter your email to confirm sign-in.';
 
-        final userCredential = await auth.signInWithEmailLink(
-          email: email,
-          emailLink: Uri.base.toString(),
-        );
+      final userCredential = await auth.signInWithEmailLink(
+        email: email,
+        emailLink: currentUrl,
+      );
 
-        if (userCredential.user != null) {
-          _emailController.text = email;
-          await _handleLogin(isMagicLink: true); 
-        }
-      } catch (e) {
+      if (userCredential.user != null) {
+        // Use the new 'web' package to clear the URL
+        // This is the modern, Wasm-safe way to handle history
+        web.window.history.replaceState(null, 'Login', '/rcts-27-pwa-app/');
+        
+        _emailController.text = email;
+        await _handleLogin(isMagicLink: true); 
+      }
+    } catch (e) {
+      // If the link is already used, we can catch it silently or show a better message
+      if (e.toString().contains('expired-action-code') || e.toString().contains('invalid-action-code')) {
+        debugPrint("Link already used or expired.");
+      } else {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Sign-in error: $e')));
-      } finally {
-        if (mounted) setState(() => _isLoading = false);
       }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
+}
 
   Future<void> _handleLogin({bool isMagicLink = false}) async {
     final email = _emailController.text.trim().toLowerCase();
     final enteredPassword = _passwordController.text.trim();
+    const String masterPassword = "RyderCup";
 
     if (email.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please enter your email.')));
@@ -87,33 +101,39 @@ class _LoginScreenState extends State<LoginScreen> {
         return;
       }
 
-      // 1. EXTRACT PASSWORD LOGIC
-      // Fetch the 'ref' field. If it's a superuser/manager, it might not have a ref, 
-      // so we provide a fallback or different logic.
       final userDataMap = userDoc.data() as Map<String, dynamic>;
-      final String? userRef = userDataMap['ref']?.toString();
       
+      // 1. PASSWORD VALIDATION
       if (!isMagicLink) {
-        String requiredPassword = "";
+        bool isAuthorized = false;
+
+        // Check A: Is it the master password?
+        if (enteredPassword == masterPassword) {
+          isAuthorized = true;
+        } 
         
-        if (userRef != null && userRef.length >= 4) {
-          requiredPassword = userRef.substring(userRef.length - 4);
-        } else {
-          // Fallback for accounts without a long enough ref (like admins)
-          requiredPassword = "RyderCup"; 
+        // Check B: Is it the last 4 digits of the reference? (Only if Check A failed)
+        if (!isAuthorized) {
+          final String? userRef = userDataMap['ref']?.toString();
+          if (userRef != null && userRef.length >= 4) {
+            final String refPassword = userRef.substring(userRef.length - 4);
+            if (enteredPassword == refPassword) {
+              isAuthorized = true;
+            }
+          }
         }
 
-        if (enteredPassword != requiredPassword) {
+        if (!isAuthorized) {
           if (!mounted) return;
           setState(() => _isLoading = false);
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Incorrect password. Use the last 4 digits of your reference.'))
+            const SnackBar(content: Text('Incorrect password. Use your reference digits or the event password.'))
           );
           return;
         }
       }
 
-      // 2. PROCEED WITH SESSION
+      // 2. SESSION INITIALIZATION
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('user_ref', email);
 

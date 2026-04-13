@@ -16,18 +16,16 @@ class BroadcastBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<QuerySnapshot>(
-      // Ordering by timestamp descending ensures the latest message is index 0
       stream: FirebaseFirestore.instance
           .collection('broadcasts')
           .orderBy('timestamp', descending: true)
-          .limit(10) // Check the last 10 to find a relevant one
+          .limit(10)
           .snapshots(),
       builder: (context, snapshot) {
         if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
           return const SizedBox.shrink();
         }
 
-        // Find the first broadcast that is either "all" or matches the user's hotel
         final broadcasts = snapshot.data!.docs
             .map((doc) => Broadcast.fromMap(doc.data() as Map<String, dynamic>))
             .where((b) => b.visibleFor(userHotelKey))
@@ -99,30 +97,28 @@ class _WeatherWidgetState extends State<WeatherWidget> {
     _weatherFuture = _fetchWeather();
   }
 
-Future<WeatherData> _fetchWeather() async {
-  try {
-    final remoteConfig = FirebaseRemoteConfig.instance;
+  Future<WeatherData> _fetchWeather() async {
+    try {
+      final remoteConfig = FirebaseRemoteConfig.instance;
+      await remoteConfig.fetchAndActivate();
 
-    // Use a simplified fetch call without complex settings here
-    await remoteConfig.fetchAndActivate();
+      final String apiKey = remoteConfig.getString('weather_api_key');
+      if (apiKey.isEmpty) throw 'Missing API Key';
 
-    final String apiKey = remoteConfig.getString('weather_api_key');
-    if (apiKey.isEmpty) throw 'Missing API Key';
+      final url = 'https://api.openweathermap.org/data/2.5/weather?lat=52.5639&lon=-8.7892&appid=$apiKey&units=metric';
 
-    final url = 'https://api.openweathermap.org/data/2.5/weather?lat=52.5639&lon=-8.7892&appid=$apiKey&units=metric';
+      final response = await http.get(Uri.parse(url)).timeout(const Duration(seconds: 10));
 
-    final response = await http.get(Uri.parse(url)).timeout(const Duration(seconds: 10));
-
-    if (response.statusCode == 200) {
-      return WeatherData.fromJson(jsonDecode(response.body));
-    } else {
-      throw 'Error: ${response.statusCode}';
+      if (response.statusCode == 200) {
+        return WeatherData.fromJson(jsonDecode(response.body));
+      } else {
+        throw 'Error: ${response.statusCode}';
+      }
+    } catch (e) {
+      debugPrint('Weather Error: $e');
+      throw 'Network Error';
     }
-  } catch (e) {
-    debugPrint('Weather Error: $e');
-    throw 'Network Error';
   }
-}
 
   @override
   Widget build(BuildContext context) {
@@ -225,7 +221,7 @@ class TicketDetails extends StatelessWidget {
           color: Colors.white,
           padding: const EdgeInsets.all(10),
           child: QrImageView(
-            data: ref, // This uses the 'ref' passed into the widget
+            data: ref,
             version: QrVersions.auto,
             size: 120.0,
             gapless: false,
@@ -381,19 +377,21 @@ class TransportDetails extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         
-        // Schedule Tiles Row
-        Row(
-          children: [
-            _buildScheduleTile('THURSDAY', thu),
-            _buildScheduleTile('FRIDAY', fri),
-            _buildScheduleTile('SATURDAY', sat),
-            _buildScheduleTile('SUNDAY', sun),
-          ],
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          physics: const BouncingScrollPhysics(),
+          child: Row(
+            children: [
+              _buildScheduleTile('Thursday', thu),
+              _buildScheduleTile('Friday', fri),
+              _buildScheduleTile('Saturday', sat),
+              _buildScheduleTile('Sunday', sun),
+            ],
+          ),
         ),
 
         const SizedBox(height: 24),
         
-        // Barcode Section
         Center(
           child: Column(
             children: [
@@ -428,56 +426,22 @@ class TransportDetails extends StatelessWidget {
     );
   }
 
-  // Helper method to build individual day tiles
   Widget _buildScheduleTile(String day, String? time) {
-    // 1. Define unique defaults for each day
     final Map<String, String> defaultSchedules = {
-      'THURSDAY': 'Departures 08:00, 09:00\nReturn 19:00',
-      'FRIDAY': 'Departures 05:00, 06:00\nReturn 18:30',
-      'SATURDAY': 'Departures 05:00, 06:00\nReturn 18:30',
-      'SUNDAY': 'Departures 09:00, 10:00\nReturn 18:00',
+      'Thursday': 'Departures 08:00, 09:00\nReturn 19:00',
+      'Friday': 'Departures 05:00, 06:00\nReturn 18:30',
+      'Saturday': 'Departures 05:00, 06:00\nReturn 18:30',
+      'Sunday': 'Departures 09:00, 10:00\nReturn 18:00',
     };
 
-    // 2. Determine display text
-    String displayTime;
-    if (time == null || time.isEmpty) {
-      // Use the specific day's default, or a generic fallback if day is not found in map
-      displayTime = defaultSchedules[day] ?? 'No Schedule\nConfigured';
-    } else {
-      // If data exists but you want to force it onto two lines at the hyphen:
-      displayTime = time.replaceAll(' - ', '\n');
-    }
+    String displayTime = (time == null || time.isEmpty)
+        ? (defaultSchedules[day] ?? 'No Schedule')
+        : time.replaceAll(' - ', '\n');
 
-    return Expanded(
-      child: Container(
-        margin: const EdgeInsets.only(right: 6),
-        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4), // Added horizontal padding
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.05),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: Colors.white10),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
-              day.toUpperCase(), 
-              style: const TextStyle(fontSize: 9, color: Colors.white38, fontWeight: FontWeight.bold)
-            ),
-            const SizedBox(height: 6),
-            Text(
-              displayTime,
-              textAlign: TextAlign.center, // Ensure multi-line text is centred
-              style: const TextStyle(
-                fontSize: 10, // Slightly smaller to accommodate two lines comfortably
-                fontWeight: FontWeight.bold, 
-                color: Colors.white,
-                height: 1.2, // Adjust line spacing
-              ),
-            ),
-          ],
-        ),
-      ),
+    return InfoCard(
+      title: day.toUpperCase(),
+      subtitle: displayTime,
+      width: 150,
     );
   }
 }
