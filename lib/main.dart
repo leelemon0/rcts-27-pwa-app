@@ -1,10 +1,11 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:cloud_firestore/cloud_firestore.dart'; // ADD THIS
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_remote_config/firebase_remote_config.dart';
 import 'firebase_options.dart';
 import 'screens/login_screen.dart';
+import 'version_check_service.dart';
 import 'dart:async';
 
 const Color primaryDarkBlue = Color(0xFF001436);
@@ -18,20 +19,17 @@ void main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-// --- CLOUD FIRESTORE OFFLINE PERSISTENCE ---
   FirebaseFirestore.instance.settings = const Settings(
     persistenceEnabled: true,
     cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
   );
 
-  // --- REMOTE CONFIG WARM UP ---
   try {
     final remoteConfig = FirebaseRemoteConfig.instance;
     await remoteConfig.setConfigSettings(RemoteConfigSettings(
       fetchTimeout: const Duration(seconds: 10),
-      minimumFetchInterval: const Duration(hours: 1), // Standard for production
+      minimumFetchInterval: const Duration(hours: 1),
     ));
-    // Fetch and activate so the key is ready immediately for the WeatherWidget
     await remoteConfig.fetchAndActivate();
   } catch (e) {
     debugPrint('Remote Config initialization failed: $e');
@@ -74,17 +72,33 @@ class AuthWrapper extends StatefulWidget {
 
 class _AuthWrapperState extends State<AuthWrapper> {
   Timer? _nudgeTimer;
+  Timer? _versionTimer;
 
   @override
   void initState() {
     super.initState();
     
-    // 1. Force the browser to keep painting (avoids the freeze)
+    // 1. Existing nudge timer to prevent web freeze
     _nudgeTimer = Timer.periodic(const Duration(milliseconds: 50), (timer) {
       if (mounted) setState(() {});
     });
 
+    // Version Check Logic
+    _initVersionCheck();
+
     _checkLoginStatus();
+  }
+
+  void _initVersionCheck() {
+    final versionService = VersionCheckService();
+    
+    // Check immediately on app launch
+    versionService.checkForUpdate();
+
+    // Check every 15 minutes while the app is open
+    _versionTimer = Timer.periodic(const Duration(minutes: 15), (timer) {
+      versionService.checkForUpdate();
+    });
   }
 
   Future<void> _checkLoginStatus() async {
@@ -95,7 +109,6 @@ class _AuthWrapperState extends State<AuthWrapper> {
       if (!mounted) return;
 
       if (savedRef != null) {
-        // We have a ref! Go straight to LoginScreen for auto-login
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (_) => LoginScreen(autoLoginRef: savedRef)),
         );
@@ -110,6 +123,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
   @override
   void dispose() {
     _nudgeTimer?.cancel();
+    _versionTimer?.cancel(); // CLEAN UP THE TIMER
     super.dispose();
   }
 
