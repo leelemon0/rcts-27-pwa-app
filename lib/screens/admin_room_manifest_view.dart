@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/user.dart';
 import '../models/hotel.dart';
+import 'dart:math';
 
 class AdminRoomManifestView extends StatelessWidget {
   final Hotel hotel;
@@ -111,7 +112,7 @@ class AdminRoomManifestView extends StatelessWidget {
                                 const Icon(Icons.meeting_room, color: Color(0xFFFFD700), size: 18),
                                 const SizedBox(width: 8),
                                 Text(
-                                  'Room $roomId — $roomType',
+                                  '$roomId — $roomType',
                                   style: const TextStyle(
                                     color: Colors.white,
                                     fontWeight: FontWeight.bold,
@@ -170,13 +171,15 @@ class AdminRoomManifestView extends StatelessWidget {
                 const SizedBox(width: 6),
               ],
               Text(
-                guest.ref ?? '',
+                guest.ref != null 
+                    ? guest.ref!.substring(0, min(guest.ref!.length, 8)) 
+                    : '',
                 style: const TextStyle(
-                  fontSize: 10, 
-                  color: Colors.white38, 
+                  fontSize: 10,
+                  color: Colors.white38,
                   letterSpacing: 0.5,
                 ),
-              ),
+              )
             ],
           ),
         ],

@@ -27,7 +27,7 @@ class RoomCardWidget extends StatelessWidget {
           children: [
             Row(
               children: [
-                const Icon(Icons.bed, color: Color(0xFFFFD700), size: 20),
+                const Icon(Icons.meeting_room, color: Color(0xFFFFD700), size: 20),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(

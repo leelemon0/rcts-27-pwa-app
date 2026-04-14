@@ -320,7 +320,7 @@ class GuestSearchDelegate extends SearchDelegate {
               child: const Text(
                 'CLEAR',
                 style: TextStyle(
-                  color: Color(0xFFFFD700), // Matching your gold accent color
+                  color: Color(0xFFFFD700),
                   fontWeight: FontWeight.bold,
                   fontSize: 13,
                 ),
